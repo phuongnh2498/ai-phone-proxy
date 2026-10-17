@@ -1,5 +1,6 @@
 // Ask AI through the user's own subscription CLIs (Claude Code, Codex, Antigravity) instead of an API key.
-import { spawn, execFileSync } from "node:child_process";
+import { spawn, execFile, execFileSync } from "node:child_process";
+import Anthropic from "@anthropic-ai/sdk";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -47,6 +48,66 @@ export function availableProviders() {
   return cache;
 }
 
+// ---------- model lists ----------
+// Each CLI knows its own catalog; we ask it instead of hardcoding names that go stale.
+export const DEFAULT_API_MODEL = process.env.PHONE_PROXY_MODEL || "claude-opus-5-5";
+const MODELS_TTL_MS = 10 * 60 * 1000;
+const CLAUDE_ALIASES = [ // Claude Code resolves these to the newest model of each family
+  { id: "fable", label: "Fable (latest)" },
+  { id: "opus", label: "Opus (latest)" },
+  { id: "sonnet", label: "Sonnet (latest)" },
+  { id: "haiku", label: "Haiku (latest)" },
+];
+const modelCache = new Map(); // provider -> { at, models }
+
+// Model names go into argv, so only allow plain ids (no leading "-" that a CLI could read as a flag).
+export const isValidModel = (m) => typeof m === "string" && /^[A-Za-z0-9][\w.:@\/\[\]-]{0,99}$/.test(m);
+
+function capture(bin, args) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(WORK_DIR, { recursive: true });
+    execFile(bin, args, { cwd: WORK_DIR, env: childEnv(), timeout: 30_000, maxBuffer: 32 * 1024 * 1024 }, (err, out) => (err ? reject(err) : resolve(out)));
+  });
+}
+
+async function anthropicModels() {
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) return [];
+  const out = [];
+  for await (const m of new Anthropic().models.list({ limit: 100 })) out.push({ id: m.id, label: `${m.display_name} (${m.id})` });
+  return out;
+}
+
+async function codexModels(bin) {
+  const { models = [] } = JSON.parse(await capture(bin, ["debug", "models"]));
+  return models.filter((m) => m.visibility === "list").sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
+    .map((m) => ({ id: m.slug, label: m.display_name || m.slug }));
+}
+
+async function agyModels(bin) {
+  return (await capture(bin, ["models"])).split("\n").map((l) => l.split("\t")).filter((c) => c.length >= 2 && isValidModel(c[0].trim()))
+    .map(([id, label]) => ({ id: id.trim(), label: label.trim() || id.trim() }));
+}
+
+// [{ id, label }]; id "" means "let the CLI / app pick its default".
+export async function listModels(provider, { refresh = false } = {}) {
+  const hit = modelCache.get(provider);
+  if (hit && !refresh && Date.now() - hit.at < MODELS_TTL_MS) return hit;
+  const bin = PROVIDERS[provider]?.bin && which(PROVIDERS[provider].bin);
+  let models = [], error = null;
+  try {
+    if (provider === "api") models = await anthropicModels();
+    else if (provider === "claude") models = [...CLAUDE_ALIASES, ...(await anthropicModels().catch(() => []))];
+    else if (provider === "codex" && bin) models = await codexModels(bin);
+    else if (provider === "agy" && bin) models = await agyModels(bin);
+  } catch (e) {
+    error = `Couldn't list models: ${String(e.message || e).split("\n")[0].slice(0, 200)}`;
+    if (provider === "claude") models = CLAUDE_ALIASES;
+  }
+  const out = { at: Date.now(), models: [{ id: "", label: provider === "api" ? `Default (${DEFAULT_API_MODEL})` : "Default" }, ...models], error };
+  if (!error) modelCache.set(provider, out);
+  return out;
+}
+
 function childEnv(provider) {
   const env = { ...process.env, PATH: fullPath() };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -76,10 +137,11 @@ function run(bin, args, provider) {
   });
 }
 
-export async function askViaCli(provider, prompt) {
+export async function askViaCli(provider, prompt, model) {
   const meta = PROVIDERS[provider];
   const bin = meta?.bin && which(meta.bin);
   if (!bin) throw new Error(`${meta?.label || provider} not found. Install it and sign in, then restart Phone Proxy.`);
+  const modelArgs = (flag) => (isValidModel(model) ? [flag, model] : []);
 
   if (provider === "claude") {
     const cfgPath = path.join(DATA_DIR, "mcp-claude.json");
@@ -91,6 +153,7 @@ export async function askViaCli(provider, prompt) {
       "--mcp-config", cfgPath, "--strict-mcp-config",
       "--tools", "",                              // no built-in file/shell tools
       "--allowedTools", "mcp__phone-proxy",       // traffic tools run without prompts
+      ...modelArgs("--model"),
     ], provider);
   }
 
@@ -106,13 +169,14 @@ export async function askViaCli(provider, prompt) {
       "-c", `mcp_servers.phone-proxy.default_tools_approval_mode="approve"`,
       "-c", `mcp_servers.phone-proxy.env={ELECTRON_RUN_AS_NODE=${toml("1")},PHONE_PROXY_DIR=${toml(DATA_DIR)}}`,
       "-o", outFile,
+      ...modelArgs("-m"),
       prompt,
     ], provider);
     try { return fs.readFileSync(outFile, "utf8"); } finally { fs.rmSync(outFile, { force: true }); }
   }
 
   if (provider === "agy") {
-    return run(bin, ["-p", prompt, "--output-format", "text", "--disable-slash-commands"], provider);
+    return run(bin, ["-p", prompt, "--output-format", "text", "--disable-slash-commands", ...modelArgs("--model")], provider);
   }
 
   throw new Error(`unknown provider ${provider}`);

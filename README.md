@@ -25,6 +25,8 @@ Ask AI — pick the engine in the AI panel's **AI via** dropdown:
 | Antigravity CLI | your Google subscription (`agy -p`) | no — answers from a traffic snapshot |
 | Anthropic API key | pay-per-use key (saved to `~/.phone-proxy/config.json`, mode 600) | yes |
 
+Next to it, pick the **model**. The list is fetched live from each engine (`codex debug models`, `agy models`, Anthropic `/v1/models`; Claude Code also offers its `fable`/`opus`/`sonnet`/`haiku` latest-model aliases). Press ↻ to refresh. **Default** lets the engine choose.
+
 The CLIs must be installed and signed in already (`claude`, `codex login`, `agy`). They run in an empty folder (`~/.phone-proxy/ai-work`) with no file/shell tools.
 
 ## Connect a phone

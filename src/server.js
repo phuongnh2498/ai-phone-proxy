@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import QRCode from "qrcode";
 import { askAI, replay, toCurl } from "./ai.js";
 import { saveConfig, loadConfig } from "./store.js";
-import { availableProviders, PROVIDERS } from "./providers.js";
+import { availableProviders, listModels, isValidModel, PROVIDERS } from "./providers.js";
 import { phoneRoute, MAGIC_HOST } from "./phone.js";
 import { isLoopback } from "./security.js";
 import { RULE_TYPES, THROTTLE_PRESETS } from "./rules.js";
@@ -110,12 +110,18 @@ export function startServer({ store, proxy, port, lanIp, proxyPort, pairing, rul
         req.on("close", () => clients.delete(res));
         return;
       }
+      if (p === "/api/models") {
+        const provider = url.searchParams.get("provider");
+        if (!PROVIDERS[provider]) return json(res, 400, { error: "unknown provider" });
+        return json(res, 200, await listModels(provider, { refresh: url.searchParams.get("refresh") === "1" }));
+      }
       if (p === "/api/info") {
         return json(res, 200, {
           lanIp, proxyPort, setupUrl, pacUrl, magicHost: MAGIC_HOST, paused: proxy.isPaused(), stats: store.stats(),
           qr: await QRCode.toDataURL(setupUrl, { margin: 1, width: 220 }),
           providers: availableProviders(),
           aiProvider: loadConfig().aiProvider || defaultProvider(),
+          aiModels: loadConfig().aiModels || {},
           aiConfigured: Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_PROFILE),
           pairing: pairing.status(),
           throttle: throttle.preset,
@@ -222,8 +228,12 @@ export function startServer({ store, proxy, port, lanIp, proxyPort, pairing, rul
         return json(res, 200, out);
       }
       if (req.method === "POST" && p === "/api/settings") {
-        const { anthropicApiKey, aiProvider } = await readJson(req);
+        const { anthropicApiKey, aiProvider, aiModel } = await readJson(req);
         if (aiProvider && PROVIDERS[aiProvider]) saveConfig({ aiProvider });
+        // aiModel: { provider, model }; model "" goes back to the provider's default.
+        if (aiModel && PROVIDERS[aiModel.provider] && (aiModel.model === "" || isValidModel(aiModel.model))) {
+          saveConfig({ aiModels: { ...(loadConfig().aiModels || {}), [aiModel.provider]: aiModel.model || undefined } });
+        }
         if (typeof anthropicApiKey === "string") {
           const key = anthropicApiKey.trim();
           saveConfig({ anthropicApiKey: key || undefined });
@@ -233,8 +243,9 @@ export function startServer({ store, proxy, port, lanIp, proxyPort, pairing, rul
       }
       if (req.method === "POST" && p === "/api/ask") {
         const body = await readJson(req);
-        const provider = loadConfig().aiProvider || defaultProvider();
-        return json(res, 200, await askAI(store, { ...body, provider }));
+        const cfg = loadConfig();
+        const provider = cfg.aiProvider || defaultProvider();
+        return json(res, 200, await askAI(store, { ...body, provider, model: cfg.aiModels?.[provider] }));
       }
       res.writeHead(404, SECURITY_HEADERS);
       res.end("not found");

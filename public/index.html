@@ -177,7 +177,9 @@ select{background:var(--panel2);border:1px solid var(--line);border-radius:7px;p
     <div id="ai">
       <div style="display:flex;gap:6px;align-items:center;padding:8px 8px 0">
         <span style="color:var(--muted);font-size:12px">AI via</span>
-        <select id="providerSel" style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:4px 6px"></select>
+        <select id="providerSel" style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:4px 6px"></select>
+        <select id="modelSel" title="Model" style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:4px 6px"></select>
+        <button id="modelRefresh" title="Fetch the latest model list" style="padding:3px 8px">↻</button>
       </div>
       <form id="keyForm" style="display:none;gap:6px;padding:8px;border-bottom:1px solid var(--line)">
         <input id="keyInput" type="password" placeholder="Anthropic API key (sk-ant-…) to enable Ask AI" style="flex:1" autocomplete="off">
@@ -783,7 +785,7 @@ $("#aiLog").addEventListener("click", (e) => { const a = e.target.closest("a.ref
 async function ask(question) {
   const log = $("#aiLog");
   log.insertAdjacentHTML("beforeend", `<div class="msg q">› ${esc(question)}</div>`);
-  const pending = document.createElement("div"); pending.className = "msg trace"; pending.textContent = `thinking via ${$("#providerSel").selectedOptions[0]?.textContent || "AI"}… (CLIs can take 10–60s)`;
+  const pending = document.createElement("div"); pending.className = "msg trace"; pending.textContent = `thinking via ${$("#providerSel").selectedOptions[0]?.textContent || "AI"}${$("#modelSel").value ? ` · ${$("#modelSel").value}` : ""}… (CLIs can take 10–60s)`;
   log.appendChild(pending); log.scrollTop = log.scrollHeight;
   try {
     const out = await post("/api/ask", { question, selectedId: state.selected, filter: { ...state.filter, tag: state.tag, q: state.q } });
@@ -934,7 +936,31 @@ async function loadInfo() {
   $("#providerSel").innerHTML = info.providers.map((p) =>
     `<option value="${p.id}" ${p.id === info.aiProvider ? "selected" : ""} ${p.available ? "" : "disabled"}>${esc(p.label)}${p.available ? "" : " — not installed"}</option>`).join("");
   $("#keyForm").style.display = info.aiProvider === "api" && !info.aiConfigured ? "flex" : "none";
+  state.aiModels = info.aiModels || {};
+  if (state.modelsFor !== info.aiProvider) loadModels();
 }
+// Model list comes from each CLI's own catalog (or the Anthropic API), cached server-side.
+async function loadModels(refresh) {
+  const provider = state.provider;
+  state.modelsFor = provider;
+  const sel = $("#modelSel");
+  sel.disabled = true;
+  sel.innerHTML = `<option>Loading models…</option>`;
+  const out = await api(`/api/models?provider=${encodeURIComponent(provider)}${refresh ? "&refresh=1" : ""}`).catch((e) => ({ models: [{ id: "", label: "Default" }], error: e.message }));
+  if (state.modelsFor !== provider) return; // provider changed while loading
+  const current = state.aiModels[provider] || "";
+  const models = out.models || [];
+  if (current && !models.some((m) => m.id === current)) models.push({ id: current, label: `${current} (saved)` });
+  sel.innerHTML = models.map((m) => `<option value="${esc(m.id)}" ${m.id === current ? "selected" : ""}>${esc(m.label)}</option>`).join("");
+  sel.disabled = false;
+  sel.title = out.error || "Model";
+  if (out.error) toast(out.error);
+}
+$("#modelSel").onchange = async (e) => {
+  state.aiModels[state.provider] = e.target.value;
+  await post("/api/settings", { aiModel: { provider: state.provider, model: e.target.value } });
+};
+$("#modelRefresh").onclick = () => loadModels(true);
 $("#providerSel").onchange = async (e) => {
   await post("/api/settings", { aiProvider: e.target.value });
   loadInfo();

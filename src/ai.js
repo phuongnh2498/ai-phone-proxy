@@ -1,10 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { randomUUID } from "node:crypto";
 import { computeTags, endpointPattern } from "./detect.js";
-import { askViaCli } from "./providers.js";
+import { askViaCli, isValidModel, DEFAULT_API_MODEL } from "./providers.js";
 import { describeBody } from "./decode.js";
 
-const MODEL = process.env.PHONE_PROXY_MODEL || "claude-opus-5-5";
+const MODEL = DEFAULT_API_MODEL;
 const MAX_TOOL_CHARS = 40_000;
 const MAX_STEPS = 10;
 
@@ -150,10 +150,10 @@ ${ctx}
 Question: ${question}`;
 }
 
-export async function askAI(store, { question, selectedId, filter, provider = "api" }) {
+export async function askAI(store, { question, selectedId, filter, provider = "api", model }) {
   if (provider !== "api") {
-    const answer = await askViaCli(provider, cliPrompt(store, { question, selectedId, filter }));
-    return { answer: answer.trim(), trace: [{ tool: `via ${provider}`, input: {} }] };
+    const answer = await askViaCli(provider, cliPrompt(store, { question, selectedId, filter }), model);
+    return { answer: answer.trim(), trace: [{ tool: `via ${provider}${model ? ` (${model})` : ""}`, input: {} }] };
   }
   const client = new Anthropic();
   const tools = trafficTools(store);
@@ -166,7 +166,7 @@ export async function askAI(store, { question, selectedId, filter, provider = "a
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const response = await client.beta.messages.create({
-      model: MODEL,
+      model: isValidModel(model) ? model : MODEL,
       max_tokens: 16000,
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
