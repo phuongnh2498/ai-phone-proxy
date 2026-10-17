@@ -1,0 +1,1018 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phone Proxy</title>
+<style>
+:root{--bg:#0f1115;--panel:#161920;--panel2:#1c2029;--line:#262b36;--text:#e6e8ee;--muted:#8a91a3;--accent:#4f8cff;--ok:#3ecf8e;--warn:#f5a524;--err:#f2555a;--sel:#22314f}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:13px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:#3a4252}button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+input,textarea{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 9px;outline:none}
+input:focus,textarea:focus{border-color:var(--accent)}
+code,pre,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:14px;margin:0 6px 0 0;white-space:nowrap}
+.stats{color:var(--muted);white-space:nowrap}.grow{flex:1}
+#search{width:220px;flex-shrink:1;min-width:140px}
+.chips{display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto;min-width:120px;flex:1 1 200px;scrollbar-width:none}.chips::-webkit-scrollbar{display:none}
+header button,header select,header label{white-space:nowrap;flex-shrink:0}
+a:has(> button){text-decoration:none;color:inherit}
+.rulelist td:last-child{white-space:nowrap}
+.chip{padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:transparent;font-size:12px;color:var(--muted)}
+.chip.on{background:var(--sel);color:var(--text);border-color:var(--accent)}
+main{flex:1;display:grid;grid-template-columns:var(--left,270px) 5px minmax(300px,1fr) 5px var(--right,460px);min-height:0}
+.gutter{background:var(--line);cursor:col-resize;position:relative;z-index:2}
+.gutter:hover,.gutter.drag{background:var(--accent)}
+.gutter.h{cursor:row-resize;height:5px;flex-shrink:0}
+body.dragging{user-select:none;cursor:col-resize}body.dragging.rows{cursor:row-resize}
+a.ref{color:#7cc4ff;text-decoration:none;border-bottom:1px dotted #7cc4ff;cursor:pointer;font-family:ui-monospace,Menlo,monospace}
+a.ref:hover{background:#1b2f45}
+tr.flash td{animation:flash 1.6s ease-out}@keyframes flash{0%{background:#2b4a7a}100%{background:transparent}}
+aside,section{min-height:0;min-width:0;display:flex;flex-direction:column}
+.tabs{display:flex;gap:2px;padding:8px;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:none;background:transparent;color:var(--muted)}
+.tabs button.on{background:var(--panel2);color:var(--text)}
+.scroll{overflow:auto;flex:1;min-height:0}
+.tree .node{display:flex;align-items:center;gap:6px;padding:4px 8px;cursor:pointer;white-space:nowrap;overflow:hidden}
+.tree .node:hover{background:var(--panel2)}.tree .node.on{background:var(--sel)}
+.tree .lbl{flex:1;overflow:hidden;text-overflow:ellipsis}
+.tree .cnt{color:var(--muted);font-size:11px}.tree .errc{color:var(--err);font-size:11px}
+.tree .caret{width:10px;color:var(--muted);font-size:10px}
+.tree .more{visibility:hidden;border:none;background:transparent;color:var(--muted);padding:0 4px;font-size:14px;line-height:1}
+.tree .node:hover .more,.tree .node.on .more{visibility:visible}.tree .more:hover{color:var(--text)}
+.treesearch{padding:0 8px 8px;border-bottom:1px solid var(--line)}.treesearch input{width:100%}
+mark{background:#4f8cff55;color:inherit;border-radius:2px}
+.ctx{position:fixed;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px;min-width:230px;box-shadow:0 8px 30px #0008;display:none}
+.ctx.on{display:block}.ctx div{padding:6px 10px;border-radius:5px;cursor:pointer;white-space:nowrap}
+.ctx div:hover{background:var(--panel2)}.ctx .danger{color:var(--err)}.ctx hr{border:none;border-top:1px solid var(--line);margin:4px 0}
+.ctx .title{color:var(--muted);font-size:11px;cursor:default;overflow:hidden;text-overflow:ellipsis;max-width:300px}.ctx .title:hover{background:none}
+.muted{border-top:1px solid var(--line);padding:6px 8px;font-size:12px;color:var(--muted);max-height:30%;overflow:auto}
+.muted summary{cursor:pointer;padding:2px 0}.muted .mrow{display:flex;justify-content:space-between;align-items:center;padding:3px 0}
+.muted .mrow button{font-size:11px;padding:1px 7px}
+.bodyhead{display:flex;align-items:center;gap:6px;margin:10px 12px 4px}.bodyhead h4{margin:0}
+.kind{font-size:10px;padding:1px 6px;border-radius:4px;background:#232937;color:var(--muted);text-transform:uppercase}
+.kind.protobuf{background:#2d2440;color:#d0a8ff}.kind.json{background:#163329;color:#6ee7b7}.kind.form{background:#1b2f45;color:#7cc4ff}.kind.binary{background:#3a2f17;color:#f5c26b}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-left:auto}
+.seg button{border:none;border-radius:0;padding:2px 8px;font-size:11px;background:transparent;color:var(--muted)}.seg button.on{background:var(--panel2);color:var(--text)}
+.bodynote{margin:0 12px;color:var(--muted);font-size:11px}
+.l1{padding-left:8px!important;font-weight:600}.l2{padding-left:22px!important}.l3{padding-left:38px!important;color:#c3c8d4}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th{position:sticky;top:0;background:var(--panel);text-align:left;font-weight:500;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);z-index:1}
+td{padding:4px 8px;border-bottom:1px solid #1b1f28;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+tr.row{cursor:pointer}tr.row:hover{background:#181c24}tr.row.on{background:var(--sel)}
+tr.dim td{opacity:.55}
+.s2{color:var(--ok)}.s3{color:var(--accent)}.s4{color:var(--warn)}.s5,.sx{color:var(--err)}
+.m{font-weight:600;font-size:11px}
+.tag{display:inline-block;font-size:10px;padding:0 5px;border-radius:4px;background:#232937;color:var(--muted);margin-right:3px}
+.tag.error,.tag.failed,.tag.pinned{background:#3a1d22;color:#ff8a8f}.tag.auth{background:#2a2540;color:#b9a4ff}.tag.analytics{background:#3a2f17;color:#f5c26b}.tag.replay{background:#163329;color:#6ee7b7}
+#detail{display:flex;flex-direction:column;min-height:0}
+#detail .empty{color:var(--muted);padding:24px;text-align:center}
+.dhead{padding:10px 12px;border-bottom:1px solid var(--line)}
+.dhead .url{word-break:break-all;margin-top:4px}
+.dhead .actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:2px 10px;padding:8px 12px}
+.kv div:nth-child(odd){color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.kv div:nth-child(even){word-break:break-all}
+.j-k{color:#7cc4ff}.j-s{color:#6ee7b7}.j-n{color:#f5c26b}.j-b{color:#d0a8ff}.j-null{color:var(--muted)}
+.pats{margin:0 14px 6px;display:flex;flex-direction:column;gap:6px}.pat{border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel2)}
+.pat .pt{font-weight:600;font-size:12px}.pat .pw{color:var(--muted);font-size:11px;margin-left:6px}.pat .pv{word-break:break-all;font-size:12px;margin-top:2px}
+.pat pre{margin:4px 0 0;white-space:pre-wrap;word-break:break-all;font-size:12px}.pat .exp{color:var(--err)}
+.tbar{display:flex;height:10px;border-radius:5px;overflow:hidden;margin:4px 14px 2px;background:var(--line)}.tbar span{display:block;min-width:2px}
+.tleg{margin:0 14px 6px;font-size:11px;color:var(--muted)}.tleg i{display:inline-block;width:8px;height:8px;border-radius:2px;margin:0 4px 0 10px}
+.tag.malformed,.tag.raw{background:#3a2f17;color:#f5c26b}
+.tag.udp{background:#1b2f45;color:#7cc4ff}
+pre.body{margin:0;padding:10px 12px;white-space:pre-wrap;word-break:break-all;max-height:none}
+h4{margin:10px 12px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+#ai{display:flex;flex-direction:column;height:var(--aih,46%);min-height:140px;background:var(--panel)}
+#ai .log{flex:1;overflow:auto;padding:10px 12px}
+#ai .msg{margin-bottom:12px}#ai .msg.q{color:#9fb7ff;font-weight:500}
+#ai .msg.a pre{background:var(--panel2);padding:8px;border-radius:6px;overflow:auto}
+#ai .msg.a code{background:var(--panel2);padding:1px 4px;border-radius:4px}
+#ai .trace{color:var(--muted);font-size:11px}
+#ai form{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line)}
+#ai textarea{flex:1;resize:none;height:38px}
+.quick{display:flex;gap:4px;flex-wrap:wrap;padding:6px 8px 0}
+.quick button{font-size:11px;padding:2px 8px}
+.modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:10}
+.modal.on{display:flex}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 24px;max-width:560px;width:calc(100% - 32px);max-height:calc(100vh - 48px);overflow-y:auto}
+.card ol li{margin:6px 0}.card img{background:#fff;border-radius:8px;padding:6px}
+.setupgrid{display:flex;gap:20px;align-items:flex-start}
+.banner{background:#1d2a45;border-bottom:1px solid #2b3d63;padding:8px 12px;display:none;gap:10px;align-items:center}
+.banner.on{display:flex}
+.tag.mocked,.tag.mapped-local,.tag.mapped-remote{background:#1b2f45;color:#7cc4ff}.tag.websocket{background:#2d2440;color:#d0a8ff}.tag.throttled{background:#3a2f17;color:#f5c26b}
+select{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:5px 6px}
+.card.wide{max-width:980px;max-height:calc(100vh - 60px);overflow:auto}
+.card h2{margin-top:0}.row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.rulelist{width:100%;margin:8px 0 14px}.rulelist td{white-space:normal}
+.field{display:flex;flex-direction:column;gap:4px;margin:6px 0}.field label{color:var(--muted);font-size:12px}
+.field input,.field textarea,.field select{width:100%}.field textarea{min-height:90px;font-family:ui-monospace,Menlo,monospace}
+.copy{display:flex;gap:6px}.copy input{flex:1}
+.devices{margin-top:10px}.devices div{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.pairbox{background:#13233d;border:1px solid #2b3d63;border-radius:10px;padding:10px 12px;margin:10px 0}
+.diff{width:100%;border-collapse:collapse;table-layout:fixed;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.diff td{white-space:pre-wrap;word-break:break-all;vertical-align:top;padding:1px 6px;border:none}
+.diff .del{background:#3a1d22}.diff .add{background:#163329}.diff .sec td{color:var(--muted);padding-top:12px;font-family:-apple-system,sans-serif;text-transform:uppercase;font-size:11px}
+.ws{font-family:ui-monospace,Menlo,monospace;font-size:12px}.ws div{padding:4px 12px;border-bottom:1px solid #1b1f28;white-space:pre-wrap;word-break:break-all}
+.ws .out{color:#9fb7ff}.ws .in{color:#c9f0d9}
+.selbar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#13233d;border-bottom:1px solid #2b3d63;font-size:12px}
+.selbar button{font-size:11px;padding:2px 8px}#listWrap:focus{outline:none}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#163329;border:1px solid #2c6b4f;color:#c9f0d9;padding:10px 16px;border-radius:10px;z-index:20;display:none}
+.menu{position:relative;display:inline-block}.menu .items{display:none;position:absolute;right:0;top:110%;background:var(--panel);border:1px solid var(--line);border-radius:8px;z-index:5;min-width:170px}
+.menu.on .items{display:block}.menu .items a{display:block;padding:7px 12px;color:var(--text);text-decoration:none}.menu .items a:hover{background:var(--panel2)}
+
+</style>
+</head>
+<body>
+<header>
+  <h1>📡 Phone Proxy</h1>
+  <span class="stats" id="stats"></span>
+  <input id="search" placeholder="Search URL, headers, bodies…  ( / )">
+  <div class="chips" id="tagchips"></div>
+  <select id="fMethod" title="Method"><option value="">Method</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>WS</option><option>RAW</option><option>TLS</option><option>PINNED</option><option>UDP</option></select>
+  <select id="fStatus" title="Status"><option value="">Status</option><option value="200-299">2xx</option><option value="300-399">3xx</option><option value="400-499">4xx</option><option value="500-599">5xx</option></select>
+  <select id="fType" title="Response type"><option value="">Type</option><option value="json">JSON</option><option value="html">HTML</option><option value="xml">XML</option><option value="protobuf">Protobuf</option><option value="image">Image</option><option value="javascript">JS</option><option value="text">Text</option></select>
+  <label style="white-space:nowrap;color:var(--muted)"><input type="checkbox" id="hideSystem" checked> hide iOS</label>
+  <label style="white-space:nowrap;color:var(--muted)" title="Hide tiny keep-alive pings on pinned connections"><input type="checkbox" id="hideKeepalive" checked> hide pings</label>
+  <select id="throttleSel" title="Network throttling"></select>
+  <button id="rulesBtn">Rules</button>
+  <button id="compareBtn" style="display:none" class="primary">Compare 2</button>
+  <div class="menu" id="exportMenu"><button id="exportBtn">Export&nbsp;▾</button><div class="items">
+    <a data-fmt="har">HAR</a><a data-fmt="postman">Postman collection</a><a data-fmt="python">Python script</a><a data-fmt="curl">cURL commands</a></div></div>
+  <button id="pauseBtn">⏸ Pause</button>
+  <button id="clearBtn">Clear</button>
+  <button id="setupBtn" class="primary">Connect phone</button>
+</header>
+<div class="banner" id="banner">
+  <span>No traffic yet. Click <b>Connect phone</b> to pair your phone (proxy <b class="mono" id="bannerProxy"></b>).</span>
+  <button id="bannerBtn" class="primary">Show setup</button>
+</div>
+<main>
+  <aside>
+    <div class="tabs"><button data-view="app" class="on">By App</button><button data-view="host">By Domain</button></div>
+    <div class="treesearch"><input id="treeSearch" placeholder="Filter apps, domains, endpoints…" autocomplete="off"></div>
+    <div class="scroll tree" id="tree"></div>
+    <details class="muted" id="mutedBox"><summary>🔇 Muted <span id="mutedCount">0</span> — not recorded</summary><div id="mutedList"></div></details>
+  </aside>
+  <div class="gutter" data-g="left" title="Drag to resize"></div>
+  <section>
+    <div class="selbar" id="selInfo" style="display:none"><b id="selCount">0</b> selected · <button id="selDelete">🗑 Delete</button><button id="selClear">Clear</button>
+      <span style="color:var(--muted);font-size:11px;margin-left:auto">Shift-click range · ⌘-click toggle · ⌘A all · ⌫ delete · Esc clear</span></div>
+    <div class="scroll" id="listWrap" tabindex="0">
+      <table>
+        <colgroup><col style="width:82px"><col style="width:120px"><col style="width:58px"><col><col style="width:52px"><col style="width:60px"><col style="width:150px"></colgroup>
+        <thead><tr><th>Time</th><th>App</th><th>Method</th><th>Host / Path</th><th>Status</th><th>ms</th><th>Tags</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+  <div class="gutter" data-g="right" title="Drag to resize"></div>
+  <div id="detail">
+    <div class="scroll" id="detailBody"><div class="empty">Select a request</div></div>
+    <div class="gutter h" data-g="ai" title="Drag to resize"></div>
+    <div id="ai">
+      <div style="display:flex;gap:6px;align-items:center;padding:8px 8px 0">
+        <span style="color:var(--muted);font-size:12px">AI via</span>
+        <select id="providerSel" style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:4px 6px"></select>
+      </div>
+      <form id="keyForm" style="display:none;gap:6px;padding:8px;border-bottom:1px solid var(--line)">
+        <input id="keyInput" type="password" placeholder="Anthropic API key (sk-ant-…) to enable Ask AI" style="flex:1" autocomplete="off">
+        <button class="primary">Save</button>
+      </form>
+      <div class="quick" id="quick"></div>
+      <div class="log" id="aiLog"><div class="trace">Ask Claude about the captured traffic. It can list, search, open and replay requests. With a request selected, it gets that request as context.</div></div>
+      <form id="aiForm"><textarea id="aiInput" placeholder="Why is login failing?  (Enter to send)"></textarea><button class="primary">Ask</button></form>
+    </div>
+  </div>
+</main>
+
+<div class="modal" id="setupModal">
+  <div class="card" style="max-width:640px">
+    <h2>Connect your phone</h2>
+    <div class="pairbox" id="pairBox"></div>
+    <div class="setupgrid">
+      <img id="qr" width="180" height="180" alt="QR code for setup page">
+      <div>
+        <p style="margin-top:0">Scan with the iPhone camera (same Wi-Fi). The setup page pairs the phone and walks you through:</p>
+        <ol>
+          <li>Wi-Fi ⓘ → Configure Proxy → <b>Automatic</b> → URL:
+            <div class="copy"><input readonly id="pacUrl" class="mono"><button id="copyPac">Copy</button></div></li>
+          <li>Download certificate (Safari) → Settings → <b>Profile Downloaded</b> → Install</li>
+          <li>General → About → <b>Certificate Trust Settings</b> → enable</li>
+          <li>Check: open <b class="mono">http://proxy.setup</b> on the phone</li>
+        </ol>
+        <p style="color:var(--muted);font-size:12px">Manual alternative: Configure Proxy → Manual → <span class="mono" id="proxyAddr"></span><br>
+          <b>Games / apps missing?</b> Many game engines ignore the Automatic (PAC) setting. Use Manual instead.<br>
+          <b>Android:</b> Wi-Fi → Modify → Proxy Manual, then install the cert from the setup page (Settings → Security → Install certificate → CA certificate). Android 7+ apps only trust it if they opt in.</p>
+      </div>
+    </div>
+    <h4 style="margin-left:0">Paired devices</h4>
+    <div class="devices" id="devices"></div>
+    <div style="text-align:right;margin-top:12px"><button id="closeSetup">Done</button></div>
+  </div>
+</div>
+
+<div class="modal" id="rulesModal">
+  <div class="card wide">
+    <h2>Rules</h2>
+    <p style="color:var(--muted);margin-top:-6px">First matching enabled rule wins. Pattern: wildcard like <span class="mono">*api.example.com/v1/user*</span> or regex <span class="mono">/\/v\d\/cart/</span>.</p>
+    <table class="rulelist"><thead><tr><th style="width:60px">On</th><th>Name</th><th style="width:110px">Type</th><th style="width:70px">Method</th><th>Pattern</th><th style="width:120px"></th></tr></thead><tbody id="ruleRows"></tbody></table>
+    <form id="ruleForm">
+      <h4 style="margin-left:0" id="ruleFormTitle">New rule</h4>
+      <input type="hidden" id="ruleId">
+      <div class="row2">
+        <div class="field" style="flex:2"><label>Name</label><input id="ruleName" placeholder="Fake empty cart"></div>
+        <div class="field" style="flex:1"><label>Type</label><select id="ruleType">
+          <option value="mock">Mock response</option><option value="map_local">Map Local (file)</option>
+          <option value="map_remote">Map Remote (redirect)</option><option value="block">Block</option></select></div>
+        <div class="field" style="flex:1"><label>Method</label><select id="ruleMethod">
+          <option>ALL</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></div>
+      </div>
+      <div class="field"><label>URL pattern</label><input id="rulePattern" class="mono" placeholder="*api.example.com/v1/cart*"></div>
+      <div class="row2" id="ruleStatusRow"><div class="field" style="width:120px"><label>Status</label><input id="ruleStatus" type="number" value="200"></div>
+        <div class="field" style="flex:1"><label>Extra headers (JSON)</label><input id="ruleHeaders" class="mono" placeholder='{"x-debug":"1"}'></div></div>
+      <div class="field" id="ruleBodyRow"><label>Response body</label><textarea id="ruleBody" placeholder='{"items":[]}'></textarea></div>
+      <div class="field" id="ruleFileRow"><label>Local file path (absolute)</label><input id="ruleFile" class="mono" placeholder="/Users/you/mocks/cart.json"></div>
+      <div class="field" id="ruleTargetRow"><label>Target URL — origin keeps the original path (http://localhost:3000), full URL replaces it</label><input id="ruleTarget" class="mono" placeholder="http://localhost:3000"></div>
+      <div class="row2" style="justify-content:flex-end"><span id="ruleErr" style="color:var(--err)"></span>
+        <button type="button" id="ruleReset">Clear form</button><button class="primary">Save rule</button><button type="button" id="closeRules">Close</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="diffModal">
+  <div class="card wide" style="max-width:1200px;width:calc(100% - 40px)">
+    <div class="row2" style="justify-content:space-between"><h2 style="margin:0">Compare requests</h2><button id="closeDiff">Close</button></div>
+    <div id="diffBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="ctx" id="ctx"></div>
+
+<div class="modal" id="relabelModal">
+  <form class="card" id="relabelForm" style="max-width:420px">
+    <h3 style="margin-top:0">Assign <span class="mono" id="relabelHost"></span> to app</h3>
+    <input id="relabelInput" style="width:100%" placeholder="App name, e.g. Shopee">
+    <div style="text-align:right;margin-top:12px;display:flex;gap:6px;justify-content:flex-end">
+      <button type="button" id="relabelCancel">Cancel</button><button class="primary">Save</button>
+    </div>
+  </form>
+</div>
+
+<script>
+const $= (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const TAGS = ["api", "auth", "error", "slow", "pinned", "udp", "malformed", "raw", "websocket", "mocked", "blocked", "analytics", "static", "replay"];
+
+const state = { sel: new Set(), anchor: null, view: "app", filter: {}, tag: null, q: "", hideSystem: true, hideKeepalive: true, f2: {}, rows: [], selected: null, paused: false, collapsed: new Set() };
+try { const v = localStorage.getItem("pp.view"); if (v) state.view = v; } catch {}
+
+function qs(extra = {}) {
+  const p = new URLSearchParams();
+  const f = { ...state.filter, ...extra };
+  for (const [k, v] of Object.entries(f)) if (v != null && v !== "") p.set(k, v);
+  if (state.tag) p.set("tag", state.tag);
+  if (state.q) p.set("q", state.q);
+  if (state.hideSystem) p.set("hideSystem", "1");
+  if (state.hideKeepalive) p.set("hideKeepalive", "1");
+  for (const [k, v] of Object.entries(state.f2)) if (v) p.set(k, v);
+  return p.toString();
+}
+const api = (path, opts) => fetch(path, opts).then((r) => r.json());
+const post = (path, body) => api(path, { method: "POST", headers: { "content-type": "application/json", "x-phone-proxy": "1" }, body: JSON.stringify(body || {}) });
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => (t.style.display = "none"), 4000); }
+
+// ---------- list ----------
+function statusCls(r) { if (r.error) return "sx"; if (!r.status) return ""; return "s" + String(r.status)[0]; }
+function rowHtml(r) {
+  const t = new Date(r.ts).toLocaleTimeString([], { hour12: false });
+  const dim = r.app_conf != null && r.app_conf < 0.6 ? " dim" : "";
+  return `<tr class="row${dim}${state.sel.has(r.id) ? " on" : ""}" data-id="${r.id}">
+    <td class="mono">${t}</td>
+    <td title="${esc(r.app)} (confidence ${r.app_conf ?? "?"})">${esc(r.app)}</td>
+    <td class="m">${esc(r.method)}</td>
+    <td title="${esc(r.url)}"><span style="color:var(--muted)">${esc(r.host)}</span>${esc(r.path)}</td>
+    <td class="${statusCls(r)}">${r.error ? "ERR" : r.status ?? (["PINNED", "UDP", "TCP"].includes(r.method) ? "—" : "…")}</td>
+    <td class="mono">${r.duration ?? ""}</td>
+    <td>${(r.tags || []).filter((x) => x !== "system").map((x) => `<span class="tag ${x}">${x}</span>`).join("")}</td></tr>`;
+}
+function renderRows() { $("#rows").innerHTML = state.rows.map(rowHtml).join(""); }
+async function loadRows() { state.rows = await api("/api/requests?" + qs({ limit: 1000 })); renderRows(); }
+
+function matches(r) {
+  const f = state.filter;
+  if (f.app && r.app !== f.app) return false;
+  if (f.host && r.host !== f.host) return false;
+  if (f.pattern && r.pattern !== f.pattern) return false;
+  if (state.tag && !(r.tags || []).includes(state.tag)) return false;
+  if (state.hideSystem && (r.tags || []).includes("system")) return false;
+  if (state.hideKeepalive && (r.tags || []).includes("keepalive")) return false;
+  if (state.q && !(r.url + " " + r.app).toLowerCase().includes(state.q.toLowerCase())) return false;
+  const f2 = state.f2;
+  if (f2.method && r.method !== f2.method) return false;
+  if (f2.statusMin && !(r.status >= f2.statusMin && r.status <= f2.statusMax)) return false;
+  if (f2.ctype && !String(r.content_type || "").includes(f2.ctype)) return false;
+  return true;
+}
+
+// ---------- tree ----------
+let groups = [];
+async function loadTree() { groups = await api("/api/groups?" + new URLSearchParams({ ...(state.hideSystem ? { hideSystem: "1" } : {}), ...(state.hideKeepalive ? { hideKeepalive: "1" } : {}) })); renderTree(); }
+function nest(rows, k1, k2) {
+  const m = new Map();
+  for (const g of rows) {
+    const a = g[k1] || "Unknown", b = g[k2] || "?";
+    if (!m.has(a)) m.set(a, { count: 0, errors: 0, kids: new Map() });
+    const n = m.get(a); n.count += g.count; n.errors += g.errors;
+    if (!n.kids.has(b)) n.kids.set(b, { count: 0, errors: 0, eps: [] });
+    const c = n.kids.get(b); c.count += g.count; c.errors += g.errors; c.eps.push(g);
+  }
+  return [...m.entries()].sort((x, y) => y[1].count - x[1].count);
+}
+function hl(text) {
+  const q = state.treeQ;
+  if (!q) return esc(text);
+  const i = text.toLowerCase().indexOf(q);
+  return i < 0 ? esc(text) : esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length));
+}
+function node(level, label, n, filter, key, hasKids) {
+  const f = state.filter;
+  const on = JSON.stringify(f) === JSON.stringify(filter) ? " on" : "";
+  const caret = hasKids ? (state.collapsed.has(key) ? "▸" : "▾") : "";
+  const more = level === 1 && !Object.keys(filter).length ? "" : `<button class="more" title="Actions (or right-click)">⋯</button>`;
+  return `<div class="node l${level}${on}" tabindex="0" data-filter='${esc(JSON.stringify(filter))}' data-key="${esc(key)}" data-count="${n.count}" data-label="${esc(label)}">
+    <span class="caret">${caret}</span><span class="lbl" title="${esc(label)}">${hl(label)}</span>
+    ${n.errors ? `<span class="errc">${n.errors}✕</span>` : ""}<span class="cnt">${n.count}</span>${more}</div>`;
+}
+function renderTree() {
+  const byApp = state.view === "app";
+  const k1 = byApp ? "app" : "host", k2 = byApp ? "host" : "app";
+  const q = state.treeQ;
+  const hit = (s) => !q || String(s).toLowerCase().includes(q);
+  const total = groups.reduce((s, g) => s + g.count, 0);
+  let html = q ? "" : node(1, "All traffic", { count: total, errors: groups.reduce((s, g) => s + g.errors, 0) }, {}, "all", false);
+  for (const [a, n] of nest(groups, k1, k2)) {
+    const parentHit = hit(a);
+    // A child matches by its own name or (app view) by one of its endpoints.
+    const kids = [...n.kids.entries()].filter(([b, c]) => parentHit || hit(b) || (byApp && c.eps.some((g) => hit(`${g.method} ${g.pattern}`))));
+    if (!kids.length) continue;
+    const key1 = k1 + ":" + a;
+    html += node(1, a, n, { [k1]: a }, key1, true);
+    if (state.collapsed.has(key1) && !q) continue;
+    for (const [b, c] of kids.sort((x, y) => y[1].count - x[1].count)) {
+      html += node(2, b, c, { [k1]: a, [k2]: b }, key1 + "|" + b, byApp);
+    }
+  }
+  $("#tree").innerHTML = html || `<div style="color:var(--muted);padding:10px">No match for “${esc(q)}”</div>`;
+  // App view: host rows expand (caret) into endpoint patterns. "ep:<key>" in the set means expanded.
+  if (byApp) {
+    for (const el of document.querySelectorAll(".tree .node.l2")) {
+      const key = el.dataset.key;
+      const f = JSON.parse(el.dataset.filter);
+      let eps = groups.filter((g) => g.app === f.app && g.host === f.host).sort((x, y) => y.count - x.count);
+      const epHits = q && !hit(f.app) && !hit(f.host) ? eps.filter((g) => hit(`${g.method} ${g.pattern}`)) : null;
+      if (!state.collapsed.has("ep:" + key) && !epHits?.length) { el.querySelector(".caret").textContent = "▸"; continue; }
+      if (epHits?.length) eps = epHits;
+      el.querySelector(".caret").textContent = "▾";
+      el.insertAdjacentHTML("afterend", eps.map((g) => node(3, `${g.method} ${g.pattern}`, g, { app: g.app, host: g.host, pattern: g.pattern, method: g.method }, "", false)).join(""));
+    }
+  }
+}
+let treeSearchT;
+$("#treeSearch").oninput = (e) => { clearTimeout(treeSearchT); treeSearchT = setTimeout(() => { state.treeQ = e.target.value.trim().toLowerCase(); renderTree(); }, 120); };
+$("#treeSearch").onkeydown = (e) => { if (e.key === "Escape") { e.target.value = ""; state.treeQ = ""; renderTree(); } };
+
+$("#tree").addEventListener("click", (e) => {
+  const el = e.target.closest(".node"); if (!el) return;
+  if (e.target.classList.contains("more")) { e.stopPropagation(); const r = e.target.getBoundingClientRect(); return openCtx(el, r.left, r.bottom); }
+  const key = el.dataset.key;
+  if (e.target.classList.contains("caret") && key && key !== "all") {
+    const k = el.classList.contains("l2") ? "ep:" + key : key;
+    state.collapsed.has(k) ? state.collapsed.delete(k) : state.collapsed.add(k);
+    return renderTree();
+  }
+  state.filter = JSON.parse(el.dataset.filter);
+  renderTree(); loadRows();
+});
+$("#tree").addEventListener("contextmenu", (e) => {
+  const el = e.target.closest(".node"); if (!el || el.dataset.key === "all") return;
+  e.preventDefault(); openCtx(el, e.clientX, e.clientY);
+});
+// Delete / Backspace on a focused tree row = delete that group.
+$("#tree").addEventListener("keydown", (e) => {
+  const el = e.target.closest(".node"); if (!el || el.dataset.key === "all") return;
+  if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteGroup(JSON.parse(el.dataset.filter), el.dataset.label, Number(el.dataset.count)); }
+});
+$("#tree").addEventListener("dblclick", (e) => {
+  const el = e.target.closest(".node.l2, .node.l1"); if (!el) return;
+  const f = JSON.parse(el.dataset.filter); if (f.host) openRelabel(f.host, f.app);
+});
+function openRelabel(host, app) {
+  $("#relabelHost").textContent = host;
+  $("#relabelInput").value = app || "";
+  $("#relabelModal").classList.add("on");
+  $("#relabelInput").focus();
+}
+
+// ---------- context menu ----------
+const ctx = $("#ctx");
+function describeFilter(f) {
+  if (f.pattern) return `${f.method} ${f.pattern}`;
+  if (f.app && f.host) return `${f.host} (in ${f.app})`;
+  return f.app || f.host;
+}
+function openCtx(el, x, y) {
+  const f = JSON.parse(el.dataset.filter);
+  const n = Number(el.dataset.count);
+  const items = [`<div class="title">${esc(describeFilter(f))} · ${n} requests</div>`, `<div data-act="show">Show only this</div>`];
+  items.push("<hr>", `<div class="danger" data-act="delete">🗑 Delete ${n} request${n === 1 ? "" : "s"}</div>`);
+  if (f.app && !f.pattern && !(f.host && state.view === "app")) items.push(`<div data-act="mute-app">🔇 Mute app “${esc(f.app)}” &amp; delete</div>`);
+  if (f.host && !f.pattern) items.push(`<div data-act="mute-host">🔇 Mute domain “${esc(f.host)}” &amp; delete</div>`);
+  items.push("<hr>");
+  if (f.host) items.push(`<div data-act="relabel">🏷 Assign ${esc(f.host)} to app…</div>`);
+  items.push(`<div data-act="copy">Copy name</div>`);
+  ctx.innerHTML = items.join("");
+  ctx.classList.add("on");
+  const r = ctx.getBoundingClientRect();
+  ctx.style.left = Math.min(x, innerWidth - r.width - 8) + "px";
+  ctx.style.top = Math.min(y, innerHeight - r.height - 8) + "px";
+  ctx.onclick = async (e) => {
+    const act = e.target.dataset.act; if (!act) return;
+    ctx.classList.remove("on");
+    if (act === "show") { state.filter = f; renderTree(); loadRows(); }
+    if (act === "delete") deleteGroup(f, describeFilter(f), n);
+    if (act === "mute-app" || act === "mute-host") {
+      const kind = act === "mute-app" ? "app" : "host";
+      if (!confirm(`Stop recording ${kind} “${f[kind]}” and delete its captured requests?\nYou can unmute it later in the 🔇 Muted list.`)) return;
+      await post("/api/mute", { kind, value: f[kind], deleteExisting: true });
+      if (state.filter[kind] === f[kind]) state.filter = {};
+      toast(`Muted ${f[kind]}`); refreshAll(); loadMuted();
+    }
+    if (act === "relabel") openRelabel(f.host, f.app);
+    if (act === "copy") { navigator.clipboard.writeText(f.pattern || f.host || f.app); toast("Copied"); }
+  };
+}
+document.addEventListener("click", (e) => { if (!e.target.closest("#ctx")) ctx.classList.remove("on"); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") ctx.classList.remove("on"); });
+
+async function deleteGroup(f, label, n) {
+  if (!confirm(`Delete ${n} request${n === 1 ? "" : "s"} for ${label}?`)) return;
+  const r = await post("/api/delete", f);
+  const same = Object.entries(f).every(([k, v]) => state.filter[k] === v);
+  if (same) state.filter = {};
+  toast(`Deleted ${r.deleted} request${r.deleted === 1 ? "" : "s"}`);
+  refreshAll();
+}
+
+async function loadMuted() {
+  const m = await api("/api/muted");
+  $("#mutedCount").textContent = m.length;
+  $("#mutedBox").style.display = m.length ? "" : "none";
+  $("#mutedList").innerHTML = m.map((x) => `<div class="mrow"><span>${x.kind === "app" ? "📱" : "🌐"} ${esc(x.value)}</span><button data-kind="${x.kind}" data-value="${esc(x.value)}">Unmute</button></div>`).join("");
+}
+$("#mutedList").onclick = async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  await post("/api/unmute", { kind: b.dataset.kind, value: b.dataset.value });
+  toast(`Unmuted ${b.dataset.value}`); loadMuted();
+};
+loadMuted();
+$("#relabelForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const app = $("#relabelInput").value.trim();
+  $("#relabelModal").classList.remove("on");
+  if (app) { await post("/api/relabel", { host: $("#relabelHost").textContent, app }); refreshAll(); }
+};
+$("#relabelCancel").onclick = () => $("#relabelModal").classList.remove("on");
+document.querySelectorAll(".tabs button").forEach((b) => {
+  b.classList.toggle("on", b.dataset.view === state.view);
+  b.onclick = () => {
+    state.view = b.dataset.view; state.filter = {};
+    try { localStorage.setItem("pp.view", state.view); } catch {}
+    document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("on", x === b));
+    renderTree(); loadRows();
+  };
+});
+
+// ---------- detail ----------
+function kv(obj) {
+  if (!obj || !Object.keys(obj).length) return `<div class="kv"><div>—</div><div></div></div>`;
+  return `<div class="kv mono">${Object.entries(obj).map(([k, v]) => `<div title="${esc(k)}">${esc(k)}</div><div>${esc(Array.isArray(v) ? v.join(", ") : v)}</div>`).join("")}</div>`;
+}
+function highlightJson(text) {
+  return esc(text).replace(/(&quot;(?:\\.|(?!&quot;).)*&quot;)(\s*:)?|\b(true|false)\b|\bnull\b|-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g,
+    (m, str, colon, bool) => str ? `<span class="${colon ? "j-k" : "j-s"}">${str}</span>${colon || ""}` : bool ? `<span class="j-b">${m}</span>` : m === "null" ? `<span class="j-null">${m}</span>` : `<span class="j-n">${m}</span>`);
+}
+function patternsBlock(list) {
+  if (!list?.length) return "";
+  return `<h4>Detected tokens &amp; keys (${list.length})</h4><div class="pats">${list.map((p) => {
+    const dec = p.type === "JWT"
+      ? `<pre>${highlightJson(JSON.stringify({ header: p.decoded.header, payload: p.decoded.payload }, null, 2))}</pre>${p.decoded.expires ? `<div class="${p.decoded.expired ? "exp" : ""}" style="font-size:11px">${p.decoded.expired ? "Expired" : "Expires"} ${esc(new Date(p.decoded.expires).toLocaleString())}</div>` : ""}`
+      : p.decoded ? `<pre>${esc(p.decoded)}</pre>` : "";
+    return `<div class="pat"><span class="pt">${esc(p.type)}</span>${p.name ? ` <span class="mono">${esc(p.name)}</span>` : ""}<span class="pw">in ${esc(p.where)}</span>
+      <div class="pv mono">${esc(p.value.length > 160 ? p.value.slice(0, 160) + "…" : p.value)}</div>${dec}</div>`;
+  }).join("")}</div>`;
+}
+function timingBlock(t) {
+  if (!t?.total) return "";
+  const parts = [["upload", "#7cc4ff", "Upload"], ["wait", "#f5c26b", "Server wait"], ["download", "#6ee7b7", "Download"]];
+  return `<div class="tbar">${parts.map(([k, c]) => t[k] ? `<span style="background:${c};width:${(t[k] / t.total) * 100}%"></span>` : "").join("")}</div>
+    <div class="tleg">${parts.map(([k, c, label]) => `<i style="background:${c}"></i>${label} ${t[k] ?? "?"} ms`).join("")}</div>`;
+}
+// Readable body: JSON pretty, form fields as a table, protobuf decoded, binary as hex. Toggle to Hex / Raw text.
+function bodyBlock(title, r, part) {
+  const v = r[part + "_view"] || { kind: "text", text: r[part + "_body"] || "" };
+  const size = r[part + "_size"];
+  const hasHex = Boolean(v.hex);
+  const readable = v.kind === "form"
+    ? `<div class="kv mono">${v.fields.map(([k, val]) => `<div title="${esc(k)}">${esc(k)}</div><div style="white-space:pre-wrap">${esc(val)}</div>`).join("")}</div>`
+    : v.kind === "json" && v.text.length < 300000 ? `<pre class="body">${highlightJson(v.text)}</pre>`
+    : `<pre class="body">${esc(v.text || "—")}</pre>`;
+  return `<div class="bodyhead"><h4>${title}${size ? ` (${size} B)` : ""}</h4>${v.kind !== "empty" ? `<span class="kind ${v.kind}">${v.kind}</span>` : ""}
+      ${hasHex || v.kind === "form" ? `<span class="seg" data-part="${part}"><button class="on" data-mode="read">Readable</button>${hasHex ? `<button data-mode="hex">Hex</button>` : `<button data-mode="raw">Raw</button>`}</span>` : ""}
+      ${r[part + "_has_raw"] ? `<a href="/api/body/${encodeURIComponent(r.id)}?part=${part}" title="Download raw bytes"><button style="font-size:11px;padding:2px 8px">⬇ .bin</button></a>` : ""}</div>
+    ${v.note ? `<p class="bodynote">${esc(v.note)}</p>` : ""}
+    <div data-body="${part}" data-mode="read">${readable}</div>
+    <template data-alt="${part}">${hasHex ? `<pre class="body">${esc(v.hex)}</pre>` : `<pre class="body">${esc(r[part + "_body"] || "")}</pre>`}</template>`;
+}
+function wireBodies(r) {
+  document.querySelectorAll("#detailBody .seg").forEach((seg) => {
+    seg.onclick = (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      const part = seg.dataset.part, box = document.querySelector(`[data-body="${part}"]`), alt = document.querySelector(`template[data-alt="${part}"]`);
+      seg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+      const showAlt = b.dataset.mode !== "read";
+      if (showAlt === (box.dataset.mode !== "read")) return;
+      const current = box.innerHTML; box.innerHTML = alt.innerHTML; alt.innerHTML = current;
+      box.dataset.mode = showAlt ? "alt" : "read";
+    };
+  });
+}
+function pretty(body) {
+  if (!body) return "—";
+  try { return JSON.stringify(JSON.parse(body), null, 2); } catch { return body; }
+}
+async function showDetail(id) {
+  state.selected = id;
+  if (!state.sel.has(id)) { state.sel = new Set([id]); state.anchor = id; paintSelection(); }
+  const r = await api("/api/request/" + encodeURIComponent(id));
+  if (r.error && !r.id) return;
+  if (r.method === "TLS") return showTlsDetail(r);
+  if (["PINNED", "UDP", "TCP"].includes(r.method)) return showFlowDetail(r);
+  const streamy = r.method === "WS" || r.method === "RAW";
+  $("#detailBody").innerHTML = `
+    <div class="dhead">
+      <div><span class="m">${esc(r.method)}</span> <span class="${statusCls(r)}">${r.error ? esc(r.error) : (r.status ?? "pending")}</span>
+        · ${r.duration ?? "?"} ms · <b>${esc(r.app)}</b> <span style="color:var(--muted)">(${Math.round((r.app_conf || 0) * 100)}%)</span></div>
+      <div class="url mono">${esc(r.url)}</div>
+      <div style="margin-top:4px">${(r.tags || []).map((x) => `<span class="tag ${x}">${x}</span>`).join("")}</div>
+      <div class="actions">
+        <button id="replayBtn">↻ Replay</button><button id="curlBtn">Copy cURL</button>
+        <a href="/api/export?format=python&ids=${encodeURIComponent(r.id)}"><button>Python</button></a>
+        <a href="/api/export?format=har&ids=${encodeURIComponent(r.id)}"><button>HAR</button></a>
+        <button id="explainBtn">✨ Explain</button><button id="whyBtn">✨ Why failing?</button><button id="clientBtn">✨ Write TS client</button>
+      </div>
+    </div>
+    ${timingBlock(r.timing)}
+    ${patternsBlock(r.patterns)}
+    <h4>Request headers</h4>${kv(r.req_headers)}
+    ${bodyBlock("Request body", r, "req")}
+    <h4>Response headers</h4>${kv(r.res_headers)}
+    ${streamy ? `<h4>${r.method === "RAW" ? "Raw TCP chunks" : "WebSocket messages"} <select id="wsDir" style="font-size:11px;margin-left:6px"><option value="">all</option><option value="received">↑ phone → server</option><option value="sent">↓ server → phone</option></select></h4><div class="ws" id="wsList">loading…</div>`
+      : bodyBlock("Response body", r, "res")}`;
+  wireBodies(r);
+  if (streamy) {
+    const msgs = await api("/api/ws/" + encodeURIComponent(id));
+    const render = () => {
+      const dir = $("#wsDir").value;
+      const list = msgs.filter((m) => !dir || m.direction === dir);
+      $("#wsList").innerHTML = list.length ? list.map((m) => `<div class="${m.direction === "received" ? "out" : "in"}">${m.direction === "received" ? "↑ phone" : "↓ server"} ${new Date(m.ts).toLocaleTimeString([], { hour12: false })} · ${m.size} B${m.is_binary ? " · binary" : ""}\n${esc(pretty(m.content))}</div>`).join("") : '<div style="color:var(--muted)">No messages yet</div>';
+    };
+    render(); $("#wsDir").onchange = render;
+  }
+  $("#replayBtn").onclick = async () => { const out = await post("/api/replay", { id }); if (out.id) showDetail(out.id); else alert(out.error); };
+  $("#curlBtn").onclick = () => navigator.clipboard.writeText(r.curl);
+  $("#explainBtn").onclick = () => ask("Explain what this request does, what data it sends and receives.");
+  $("#whyBtn").onclick = () => ask("Is this request failing or suspicious? Find the root cause; compare with similar successful requests if any.");
+  $("#clientBtn").onclick = () => ask("Write a minimal TypeScript function that calls this endpoint, with types for request and response inferred from the captured data.");
+}
+// ---------- Finder-style selection ----------
+// click = one, Shift-click = range from anchor, Cmd/Ctrl-click = toggle, Cmd+A = all,
+// ↑/↓ move (Shift extends), Delete/Backspace = delete selected, Esc = clear.
+function paintSelection() {
+  document.querySelectorAll("tr.row").forEach((tr) => tr.classList.toggle("on", state.sel.has(tr.dataset.id)));
+  const n = state.sel.size;
+  $("#compareBtn").style.display = n === 2 ? "" : "none";
+  $("#selInfo").style.display = n > 1 ? "" : "none";
+  $("#selCount").textContent = n;
+}
+const rowIds = () => state.rows.map((r) => r.id);
+function selectRange(fromId, toId) {
+  const ids = rowIds();
+  let a = ids.indexOf(fromId), b = ids.indexOf(toId);
+  if (a < 0) a = b;
+  if (a > b) [a, b] = [b, a];
+  return ids.slice(a, b + 1);
+}
+// A failed TLS handshake has no request to replay or inspect: explain what it means instead.
+function showFlowDetail(r) {
+  const what = r.method === "PINNED"
+    ? `This app pins its certificate, so Phone Proxy passed the connection through untouched to keep the app working. The content is encrypted end to end. Only the host, timing and size are known.`
+    : r.method === "UDP" ? `UDP traffic (often realtime game or voice data). Phone Proxy relays it and counts bytes. There's no HTTP inside to show.`
+    : `Phone Proxy couldn't reach its own proxy, so this connection went direct (not decrypted).`;
+  $("#detailBody").innerHTML = `
+    <div class="dhead">
+      <div><span class="m">${esc(r.method)}</span> · ${r.duration ?? "?"} ms · <b>${esc(r.app)}</b> · ${new Date(r.ts).toLocaleTimeString([], { hour12: false })}</div>
+      <div class="url mono">${esc(r.url)}</div>
+      <div style="margin-top:4px">${(r.tags || []).map((x) => `<span class="tag ${x}">${x}</span>`).join("")}</div>
+      <div class="actions"><button id="flowWhy">✨ What is this host?</button></div>
+    </div>
+    <div style="padding:10px 14px;line-height:1.55">
+      <p style="margin-top:0">↑ <b>${kb(r.req_size || 0)}</b> sent · ↓ <b>${kb(r.res_size || 0)}</b> received</p>
+      <p>${what}</p>
+    </div>`;
+  $("#flowWhy").onclick = () => ask(`What is ${r.host}, which app or SDK uses it, and what is it likely doing given ${r.req_size} bytes sent and ${r.res_size} received?`);
+}
+function showTlsDetail(r) {
+  $("#detailBody").innerHTML = `
+    <div class="dhead">
+      <div><span class="m">TLS</span> <span class="sx">handshake refused</span> · <b>${esc(r.app)}</b> · ${new Date(r.ts).toLocaleTimeString([], { hour12: false })}</div>
+      <div class="url mono">${esc(r.host)}</div>
+      <div style="margin-top:4px">${(r.tags || []).map((x) => `<span class="tag ${x}">${x}</span>`).join("")}</div>
+      <div class="actions"><button id="tlsWhy">✨ What is this host?</button></div>
+    </div>
+    <div style="padding:10px 14px;line-height:1.55">
+      <p style="margin-top:0">The app opened a secure connection to <b class="mono">${esc(r.host)}</b>, saw Phone Proxy's certificate, and <b>hung up on purpose</b>.</p>
+      <p>Usually that's <b>certificate pinning</b>: this code only trusts its own server certificate. Game engines can also fail here because they speak an old TLS version or cipher (failure <span class="mono">no-shared-cipher</span>), or because they ship their own CA list and ignore the phone's trusted certificates. No request was sent through the proxy, so there are no headers or body to show. Phone Proxy can only show <i>that</i> the connection happened and <i>where</i> it went.</p>
+      <p style="color:var(--muted)">Other causes of this error: the certificate isn't trusted on the phone yet (then <b>every</b> HTTPS app would fail, not just this host), or the app was closed mid-connection.</p>
+      <p class="mono" style="color:var(--muted);font-size:12px">${esc(r.error || "")}</p>
+    </div>`;
+  $("#tlsWhy").onclick = () => ask(`What is ${r.host}, which app or SDK uses it, and why would it refuse the proxy certificate?`);
+}
+$("#rows").addEventListener("mousedown", (e) => { if (e.shiftKey) e.preventDefault(); }); // no text selection on shift-click
+$("#rows").addEventListener("click", (e) => {
+  const tr = e.target.closest("tr.row"); if (!tr) return;
+  const id = tr.dataset.id;
+  $("#listWrap").focus({ preventScroll: true });
+  if (e.shiftKey && state.anchor) {
+    const range = selectRange(state.anchor, id);
+    state.sel = new Set(e.metaKey || e.ctrlKey ? [...state.sel, ...range] : range);
+    paintSelection();
+    return;
+  }
+  if (e.metaKey || e.ctrlKey) {
+    state.sel.has(id) ? state.sel.delete(id) : state.sel.add(id);
+    state.anchor = id;
+    paintSelection();
+    if (state.sel.has(id)) showDetail(id);
+    return;
+  }
+  state.sel = new Set([id]); state.anchor = id;
+  paintSelection();
+  showDetail(id);
+});
+$("#listWrap").addEventListener("keydown", async (e) => {
+  const ids = rowIds();
+  if (!ids.length) return;
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === "a") {
+    e.preventDefault(); state.sel = new Set(ids); paintSelection(); return;
+  }
+  if (e.key === "Escape") { state.sel = new Set(); paintSelection(); return; }
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    const cur = state.selected && ids.includes(state.selected) ? ids.indexOf(state.selected) : -1;
+    const next = Math.min(Math.max(cur + (e.key === "ArrowDown" ? 1 : -1), 0), ids.length - 1);
+    const id = ids[next];
+    if (e.shiftKey && state.anchor) state.sel = new Set(selectRange(state.anchor, id));
+    else { state.sel = new Set([id]); state.anchor = id; }
+    paintSelection();
+    await showDetail(id);
+    document.querySelector(`tr.row[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest" });
+    return;
+  }
+  if ((e.key === "Delete" || e.key === "Backspace") && state.sel.size) { e.preventDefault(); deleteSelected(); }
+});
+async function deleteSelected() {
+  const ids = [...state.sel];
+  if (!ids.length) return;
+  if (ids.length > 1 && !confirm(`Delete ${ids.length} selected requests?`)) return;
+  const r = await post("/api/delete-ids", { ids });
+  const gone = new Set(ids);
+  // Keep the cursor near where it was: select the next remaining row.
+  const all = rowIds(), lastIdx = Math.max(...ids.map((id) => all.indexOf(id)));
+  state.rows = state.rows.filter((x) => !gone.has(x.id));
+  const nextId = all.slice(lastIdx + 1).find((id) => !gone.has(id)) || state.rows[state.rows.length - 1]?.id;
+  state.sel = new Set(nextId ? [nextId] : []); state.anchor = nextId || null;
+  renderRows(); loadTree(); loadInfo();
+  if (nextId) showDetail(nextId); else { state.selected = null; $("#detailBody").innerHTML = '<div class="empty">Select a request</div>'; }
+  toast(`Deleted ${r.deleted} request${r.deleted === 1 ? "" : "s"}`);
+}
+$("#selDelete").onclick = deleteSelected;
+$("#selClear").onclick = () => { state.sel = new Set(); paintSelection(); };
+
+// ---------- compare ----------
+function lineDiff(a, b) {
+  const A = String(a ?? "").split("\n"), B = String(b ?? "").split("\n");
+  if (A.length * B.length > 400000) return A.map((l, i) => [l, B[i] ?? "", l === B[i] ? "" : "chg"]);
+  const dp = Array.from({ length: A.length + 1 }, () => new Uint16Array(B.length + 1));
+  for (let i = A.length - 1; i >= 0; i--) for (let j = B.length - 1; j >= 0; j--) dp[i][j] = A[i] === B[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const out = []; let i = 0, j = 0;
+  while (i < A.length || j < B.length) {
+    if (i < A.length && j < B.length && A[i] === B[j]) { out.push([A[i], B[j], ""]); i++; j++; }
+    else if (j < B.length && (i >= A.length || dp[i][j + 1] >= dp[i + 1][j])) { out.push(["", B[j], "add"]); j++; }
+    else { out.push([A[i], "", "del"]); i++; }
+  }
+  return out;
+}
+const hdrText = (h) => Object.entries(h || {}).sort(([x], [y]) => x.localeCompare(y)).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join("\n");
+$("#compareBtn").onclick = async () => {
+  const [a, b] = await Promise.all([...state.sel].slice(0, 2).map((id) => api("/api/request/" + encodeURIComponent(id))));
+  const sections = [
+    ["Request line", `${a.method} ${a.url}\nstatus ${a.status ?? a.error}\n${a.duration} ms · ${a.app}`, `${b.method} ${b.url}\nstatus ${b.status ?? b.error}\n${b.duration} ms · ${b.app}`],
+    ["Request headers", hdrText(a.req_headers), hdrText(b.req_headers)],
+    ["Request body", pretty(a.req_body), pretty(b.req_body)],
+    ["Response headers", hdrText(a.res_headers), hdrText(b.res_headers)],
+    ["Response body", pretty(a.res_body), pretty(b.res_body)],
+  ];
+  $("#diffBody").innerHTML = `<table class="diff"><colgroup><col><col></colgroup>${sections.map(([title, x, y]) => {
+    const rows = lineDiff(x, y);
+    const changed = rows.some((r) => r[2]);
+    return `<tr class="sec"><td>${title} ${changed ? "· changed" : "· same"}</td><td></td></tr>` +
+      rows.map(([l, r, k]) => `<tr><td class="${k === "del" || k === "chg" ? "del" : ""}">${esc(l)}</td><td class="${k === "add" || k === "chg" ? "add" : ""}">${esc(r)}</td></tr>`).join("");
+  }).join("")}</table>`;
+  $("#diffModal").classList.add("on");
+};
+$("#closeDiff").onclick = () => $("#diffModal").classList.remove("on");
+
+// ---------- AI ----------
+const QUICK = ["Summarize what my phone is doing", "Which apps send data to trackers?", "List all failing requests and why", "Which endpoints are slowest?", "Find any leaked tokens or PII"];
+$("#quick").innerHTML = QUICK.map((q) => `<button>${esc(q)}</button>`).join("");
+$("#quick").onclick = (e) => { if (e.target.tagName === "BUTTON") ask(e.target.textContent); };
+function md(s) {
+  const blocks = String(s).split(/```/);
+  return blocks.map((b, i) => {
+    if (i % 2) return `<pre><code>${esc(b.replace(/^\w*\n/, ""))}</code></pre>`;
+    return esc(b)
+      .replace(/^### (.*)$/gm, "<b>$1</b>").replace(/^## (.*)$/gm, "<b>$1</b>").replace(/^# (.*)$/gm, "<b>$1</b>")
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/^\s*[-*] (.*)$/gm, "• $1").replace(/\n/g, "<br>");
+  }).join("").replace(/(^|[^\w-])([0-9a-f]{8}(?:-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?)(?![\w-])/g,
+    (m, pre, id) => `${pre}<a class="ref" data-ref="${id}" title="Show this request">${id}</a>`);
+}
+
+// Click a request id in an AI answer: find it, clear filters if it's hidden, select + scroll + flash.
+async function focusRequest(ref) {
+  const r = await api("/api/request/" + encodeURIComponent(ref));
+  if (!r || !r.id) return toast(`Request ${ref} not found (maybe cleared)`);
+  if (!state.rows.some((x) => x.id === r.id)) {
+    state.filter = {}; state.tag = null; state.q = ""; $("#search").value = "";
+    state.f2 = {}; $("#fMethod").value = $("#fStatus").value = $("#fType").value = "";
+    document.querySelectorAll(".chip").forEach((c) => c.classList.remove("on"));
+    if ((r.tags || []).includes("system") && state.hideSystem) { state.hideSystem = false; $("#hideSystem").checked = false; }
+    await loadRows(); renderTree();
+  }
+  await showDetail(r.id);
+  const tr = document.querySelector(`tr.row[data-id="${CSS.escape(r.id)}"]`);
+  if (tr) { tr.scrollIntoView({ block: "center", behavior: "smooth" }); tr.classList.add("flash"); setTimeout(() => tr.classList.remove("flash"), 1700); }
+}
+$("#aiLog").addEventListener("click", (e) => { const a = e.target.closest("a.ref"); if (a) { e.preventDefault(); focusRequest(a.dataset.ref); } });
+async function ask(question) {
+  const log = $("#aiLog");
+  log.insertAdjacentHTML("beforeend", `<div class="msg q">› ${esc(question)}</div>`);
+  const pending = document.createElement("div"); pending.className = "msg trace"; pending.textContent = `thinking via ${$("#providerSel").selectedOptions[0]?.textContent || "AI"}… (CLIs can take 10–60s)`;
+  log.appendChild(pending); log.scrollTop = log.scrollHeight;
+  try {
+    const out = await post("/api/ask", { question, selectedId: state.selected, filter: { ...state.filter, tag: state.tag, q: state.q } });
+    pending.remove();
+    if (out.error) throw new Error(out.error);
+    const trace = (out.trace || []).map((t) => `${t.tool}(${esc(JSON.stringify(t.input)).slice(0, 80)})`).join(" → ");
+    log.insertAdjacentHTML("beforeend", `${trace ? `<div class="trace">🔧 ${trace}</div>` : ""}<div class="msg a">${md(out.answer)}</div>`);
+  } catch (e) {
+    pending.className = "msg"; pending.style.color = "var(--err)";
+    pending.textContent = "AI error: " + e.message;
+    if (state.provider === "api" && /authentication|api key|401/i.test(e.message)) $("#keyForm").style.display = "flex";
+  }
+  log.scrollTop = log.scrollHeight;
+}
+$("#aiForm").onsubmit = (e) => { e.preventDefault(); const v = $("#aiInput").value.trim(); if (v) { $("#aiInput").value = ""; ask(v); } };
+$("#aiInput").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#aiForm").requestSubmit(); } });
+
+// ---------- header controls ----------
+$("#tagchips").innerHTML = TAGS.map((t) => `<button class="chip" data-tag="${t}">${t}</button>`).join("");
+$("#tagchips").onclick = (e) => {
+  const t = e.target.dataset.tag; if (!t) return;
+  state.tag = state.tag === t ? null : t;
+  document.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.tag === state.tag));
+  loadRows();
+};
+let searchT;
+$("#search").oninput = (e) => { clearTimeout(searchT); searchT = setTimeout(() => { state.q = e.target.value.trim(); loadRows(); }, 250); };
+document.addEventListener("keydown", (e) => { if (e.key === "/" && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") { e.preventDefault(); $("#search").focus(); } });
+$("#hideSystem").onchange = (e) => { state.hideSystem = e.target.checked; refreshAll(); };
+$("#hideKeepalive").onchange = (e) => { state.hideKeepalive = e.target.checked; refreshAll(); };
+$("#fMethod").onchange = (e) => { state.f2.method = e.target.value; loadRows(); };
+$("#fStatus").onchange = (e) => { const [a, b] = e.target.value.split("-"); state.f2.statusMin = a || ""; state.f2.statusMax = b || ""; loadRows(); };
+$("#fType").onchange = (e) => { state.f2.ctype = e.target.value; loadRows(); };
+$("#clearBtn").onclick = async () => { if (!confirm("Delete all captured traffic?")) return; await post("/api/clear"); state.selected = null; $("#detailBody").innerHTML = '<div class="empty">Select a request</div>'; refreshAll(); };
+$("#pauseBtn").onclick = async () => { const r = await post("/api/pause", { paused: !state.paused }); state.paused = r.paused; $("#pauseBtn").textContent = r.paused ? "▶ Resume" : "⏸ Pause"; };
+let pairTimer;
+function renderPairing(p) {
+  state.pairing = p;
+  clearInterval(pairTimer);
+  const box = $("#pairBox");
+  const tick = () => {
+    const left = Math.max(0, Math.round((p.until - Date.now()) / 1000));
+    if (p.open && left > 0) box.innerHTML = `🟢 <b>Pairing open</b> for ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} — scan the QR with your phone now. The first phone to open the page gets paired, then pairing closes.`;
+    else { box.innerHTML = `🔒 Pairing closed. Only paired devices can use the proxy. <button id="reopenPair">Pair a new device</button>`; $("#reopenPair").onclick = () => post("/api/pairing", { open: true }).then(renderPairing); clearInterval(pairTimer); }
+  };
+  tick(); if (p.open) pairTimer = setInterval(tick, 1000);
+  const t = (ts) => ts ? new Date(ts).toLocaleTimeString([], { hour12: false }) : null;
+  const status = (d) => {
+    if (d.last_traffic) return `<span style="color:var(--ok)">✓ traffic flowing (last ${t(d.last_traffic)})</span>`;
+    if (d.pac?.proxied) return `<span style="color:var(--warn)">PAC fetched ${t(d.pac.ts)} but no traffic yet: open any app on the phone</span>`;
+    if (d.pac && !d.pac.proxied) return `<span style="color:var(--err)">Phone fetched the PAC before pairing (got "direct"). Turn the phone's Wi-Fi off and on.</span>`;
+    return `<span style="color:var(--err)">Phone hasn't fetched the PAC yet. Check Configure Proxy → Automatic URL, then turn Wi-Fi off/on.</span>`;
+  };
+  $("#devices").innerHTML = p.devices.length ? p.devices.map((d) => `<div><span>📱 <b>${esc(d.name)}</b> <span class="mono" style="color:var(--muted)">${esc(d.ip)}</span><br><span style="font-size:12px">${status(d)}</span></span><button data-ip="${esc(d.ip)}">Forget</button></div>`).join("") : '<div style="color:var(--muted)">No devices paired yet.</div>';
+}
+$("#devices").onclick = async (e) => { const ip = e.target.dataset.ip; if (ip && confirm(`Forget ${ip}? It will no longer be able to use the proxy.`)) renderPairing(await post("/api/devices/forget", { ip })); };
+// Only auto-open pairing when nothing is paired yet; otherwise the user clicks "Pair a new device".
+const openSetup = async () => {
+  $("#setupModal").classList.add("on");
+  const info = await api("/api/info");
+  renderPairing(info.pairing.devices.length ? info.pairing : await post("/api/pairing", { open: true }));
+};
+$("#setupBtn").onclick = openSetup; $("#bannerBtn").onclick = openSetup;
+// Closing the dialog also closes any open pairing window.
+$("#closeSetup").onclick = () => { $("#setupModal").classList.remove("on"); if (state.pairing?.open) post("/api/pairing", { open: false }); };
+$("#copyPac").onclick = () => { navigator.clipboard.writeText($("#pacUrl").value); toast("PAC URL copied"); };
+
+// ---------- throttle ----------
+$("#throttleSel").onchange = async (e) => { await post("/api/throttle", { preset: e.target.value }); toast(e.target.value === "off" ? "Throttling off" : `Throttling: ${e.target.selectedOptions[0].textContent}`); };
+
+// ---------- export ----------
+$("#exportBtn").onclick = (e) => { e.stopPropagation(); $("#exportMenu").classList.toggle("on"); };
+document.addEventListener("click", () => $("#exportMenu").classList.remove("on"));
+$("#exportMenu .items").onclick = (e) => {
+  const fmt = e.target.dataset.fmt; if (!fmt) return;
+  // With several requests selected, export just those; otherwise everything currently shown.
+  location.href = state.sel.size > 1
+    ? `/api/export?format=${fmt}&ids=${[...state.sel].map(encodeURIComponent).join(",")}`
+    : "/api/export?" + qs({ format: fmt, limit: 5000 });
+};
+
+// ---------- rules ----------
+const ruleTypeLabel = { mock: "Mock", map_local: "Map Local", map_remote: "Map Remote", block: "Block" };
+async function loadRules() {
+  const rules = await api("/api/rules");
+  state.rules = rules;
+  $("#ruleRows").innerHTML = rules.length ? rules.map((r) => `<tr data-id="${esc(r.id)}">
+    <td><input type="checkbox" data-act="toggle" ${r.enabled ? "checked" : ""}></td><td>${esc(r.name || "—")}</td><td>${ruleTypeLabel[r.type]}</td>
+    <td>${esc(r.method)}</td><td class="mono">${esc(r.pattern)}</td><td><button data-act="edit">Edit</button> <button data-act="del">Delete</button></td></tr>`).join("")
+    : '<tr><td colspan="6" style="color:var(--muted)">No rules yet.</td></tr>';
+}
+function ruleFormFields() {
+  const t = $("#ruleType").value;
+  $("#ruleStatusRow").style.display = t === "mock" || t === "map_local" ? "" : "none";
+  $("#ruleBodyRow").style.display = t === "mock" ? "" : "none";
+  $("#ruleFileRow").style.display = t === "map_local" ? "" : "none";
+  $("#ruleTargetRow").style.display = t === "map_remote" ? "" : "none";
+}
+function fillRuleForm(r = {}) {
+  $("#ruleId").value = r.id || ""; $("#ruleName").value = r.name || ""; $("#ruleType").value = r.type || "mock";
+  $("#ruleMethod").value = r.method || "ALL"; $("#rulePattern").value = r.pattern || ""; $("#ruleStatus").value = r.status || 200;
+  $("#ruleHeaders").value = r.headers && Object.keys(r.headers).length ? JSON.stringify(r.headers) : "";
+  $("#ruleBody").value = r.body || ""; $("#ruleFile").value = r.file_path || ""; $("#ruleTarget").value = r.target || "";
+  $("#ruleFormTitle").textContent = r.id ? "Edit rule" : "New rule"; $("#ruleErr").textContent = "";
+  ruleFormFields();
+}
+$("#ruleType").onchange = ruleFormFields;
+$("#ruleReset").onclick = () => fillRuleForm();
+$("#rulesBtn").onclick = async () => { await loadRules(); fillRuleForm(); $("#rulesModal").classList.add("on"); };
+$("#closeRules").onclick = () => $("#rulesModal").classList.remove("on");
+$("#ruleRows").onclick = async (e) => {
+  const act = e.target.dataset.act; if (!act) return;
+  const id = e.target.closest("tr").dataset.id; const r = state.rules.find((x) => x.id === id);
+  if (act === "edit") fillRuleForm(r);
+  if (act === "del" && confirm(`Delete rule "${r.name || r.pattern}"?`)) { await post("/api/rules/delete", { id }); loadRules(); }
+  if (act === "toggle") { await post("/api/rules", { ...r, enabled: e.target.checked }); loadRules(); }
+};
+$("#ruleForm").onsubmit = async (e) => {
+  e.preventDefault();
+  let headers = {};
+  try { headers = $("#ruleHeaders").value.trim() ? JSON.parse($("#ruleHeaders").value) : {}; } catch { $("#ruleErr").textContent = "Headers must be valid JSON"; return; }
+  const existing = state.rules?.find((x) => x.id === $("#ruleId").value);
+  const out = await post("/api/rules", {
+    id: $("#ruleId").value || undefined, name: $("#ruleName").value.trim(), type: $("#ruleType").value, method: $("#ruleMethod").value,
+    pattern: $("#rulePattern").value.trim(), status: $("#ruleStatus").value, headers, body: $("#ruleBody").value,
+    file_path: $("#ruleFile").value.trim(), target: $("#ruleTarget").value.trim(), enabled: existing ? existing.enabled : true,
+  });
+  if (out.error) { $("#ruleErr").textContent = out.error; return; }
+  fillRuleForm(); loadRules(); toast("Rule saved");
+};
+
+async function loadInfo() {
+  const info = await api("/api/info");
+  $("#qr").src = info.qr;
+  $("#proxyAddr").textContent = `${info.lanIp} : ${info.proxyPort}`;
+  $("#pacUrl").value = info.pacUrl;
+  if (!state.throttleInit) {
+    $("#throttleSel").innerHTML = Object.entries(info.throttlePresets).map(([k, v]) => `<option value="${k}">${k === "off" ? "🌐 " : "🐢 "}${esc(v)}</option>`).join("");
+    state.throttleInit = true;
+  }
+  $("#throttleSel").value = info.throttle;
+  if ($("#setupModal").classList.contains("on")) renderPairing(info.pairing);
+  $("#bannerProxy").textContent = `${info.lanIp}:${info.proxyPort}`;
+  $("#banner").classList.toggle("on", info.stats.total === 0);
+  $("#stats").textContent = `${info.stats.total} req · ${info.stats.apps} apps · ${info.stats.hosts} hosts`;
+  state.provider = info.aiProvider;
+  state.aiConfigured = info.aiConfigured;
+  $("#providerSel").innerHTML = info.providers.map((p) =>
+    `<option value="${p.id}" ${p.id === info.aiProvider ? "selected" : ""} ${p.available ? "" : "disabled"}>${esc(p.label)}${p.available ? "" : " — not installed"}</option>`).join("");
+  $("#keyForm").style.display = info.aiProvider === "api" && !info.aiConfigured ? "flex" : "none";
+}
+$("#providerSel").onchange = async (e) => {
+  await post("/api/settings", { aiProvider: e.target.value });
+  loadInfo();
+};
+$("#keyForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const r = await post("/api/settings", { anthropicApiKey: $("#keyInput").value });
+  $("#keyInput").value = "";
+  $("#keyForm").style.display = r.aiConfigured ? "none" : "flex";
+};
+function refreshAll() { loadRows(); loadTree(); loadInfo(); }
+
+// ---------- resizable panels (sizes remembered per Mac) ----------
+const root = document.documentElement;
+const LAYOUT_KEY = "pp.layout";
+function applyLayout(l) {
+  if (l.left) root.style.setProperty("--left", l.left + "px");
+  if (l.right) root.style.setProperty("--right", l.right + "px");
+  if (l.aih) root.style.setProperty("--aih", l.aih + "px");
+}
+let layout = {};
+try { layout = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "{}"); } catch {}
+applyLayout(layout);
+document.querySelectorAll(".gutter").forEach((g) => {
+  g.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    g.classList.add("drag"); document.body.classList.add("dragging");
+    if (g.dataset.g === "ai") document.body.classList.add("rows");
+    const main = $("main").getBoundingClientRect();
+    const detail = $("#detail").getBoundingClientRect();
+    const move = (ev) => {
+      if (g.dataset.g === "left") layout.left = Math.round(Math.min(Math.max(ev.clientX - main.left, 160), main.width - 700));
+      if (g.dataset.g === "right") layout.right = Math.round(Math.min(Math.max(main.right - ev.clientX, 300), main.width - 520));
+      if (g.dataset.g === "ai") layout.aih = Math.round(Math.min(Math.max(detail.bottom - ev.clientY, 140), detail.height - 120));
+      applyLayout(layout);
+    };
+    const up = () => {
+      g.classList.remove("drag"); document.body.classList.remove("dragging", "rows");
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
+      try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch {}
+    };
+    // Listen on window so fast drags that leave the 5px gutter keep tracking.
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  });
+  // Double-click a gutter to reset that panel to its default size.
+  g.addEventListener("dblclick", () => {
+    const k = { left: "left", right: "right", ai: "aih" }[g.dataset.g];
+    delete layout[k]; root.style.removeProperty("--" + k);
+    try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch {}
+  });
+});
+
+// ---------- live ----------
+let treeDirty = false;
+const ago = (ms) => !ms ? "never" : ms > Date.now() - 60000 ? "just now" : `${Math.round((Date.now() - ms) / 60000)} min ago`;
+const kb = (n) => n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : (n / 1024).toFixed(1) + " KB";
+const es = new EventSource("/api/events");
+es.onmessage = (e) => {
+  const msg = JSON.parse(e.data);
+  if (msg.type === "device") { if (!msg.removed) toast(`📱 ${msg.name} paired (${msg.ip})`); loadInfo(); return; }
+  if (msg.type === "pairing" || msg.type === "pac") { loadInfo(); return; }
+  const { type, row } = msg;
+  treeDirty = true;
+  const i = state.rows.findIndex((r) => r.id === row.id);
+  if (i >= 0) {
+    state.rows[i] = row;
+    const tr = document.querySelector(`tr.row[data-id="${CSS.escape(row.id)}"]`);
+    if (tr) tr.outerHTML = rowHtml(row);
+    if (state.selected === row.id) showDetail(row.id);
+  } else if (type === "new" && matches(row)) {
+    state.rows.unshift(row);
+    if (state.rows.length > 1000) state.rows.pop();
+    $("#rows").insertAdjacentHTML("afterbegin", rowHtml(row));
+  }
+};
+setInterval(() => { if (treeDirty) { treeDirty = false; loadTree(); loadInfo(); } }, 1500);
+
+refreshAll();
+</script>
+</body>
+</html>

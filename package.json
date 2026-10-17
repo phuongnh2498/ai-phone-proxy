@@ -1,0 +1,62 @@
+{
+  "name": "phone-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AI-native HTTPS debugging proxy for your phone",
+  "scripts": {
+    "start": "env -u ELECTRON_RUN_AS_NODE electron .",
+    "cli": "ELECTRON_RUN_AS_NODE=1 electron src/main.js",
+    "mcp": "ELECTRON_RUN_AS_NODE=1 electron src/mcp.js",
+    "postinstall": "electron-builder install-app-deps",
+    "dist": "electron-builder --mac dir dmg",
+    "dist:dir": "electron-builder --mac dir",
+    "test": "ELECTRON_RUN_AS_NODE=1 electron --test test/lan-exposure.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.132.1",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "better-sqlite3": "^12.11.1",
+    "mockttp": "^4.6.3",
+    "qrcode": "^1.5.4",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "electron": "^41.7.1",
+    "electron-builder": "^26.15.3"
+  },
+  "main": "electron/main.js",
+  "author": "phuongnh2498",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/phuongnh2498/ai-phone-proxy.git"
+  },
+  "bugs": "https://github.com/phuongnh2498/ai-phone-proxy/issues",
+  "build": {
+    "appId": "io.github.phuongnh2498.aiphoneproxy",
+    "productName": "Phone Proxy",
+    "asar": false,
+    "files": [
+      "electron/**",
+      "src/**",
+      "public/**",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist.noindex"
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dir"
+        }
+      ],
+      "identity": null
+    }
+  }
+}
