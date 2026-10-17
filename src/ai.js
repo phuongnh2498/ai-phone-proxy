@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { randomUUID } from "node:crypto";
 import { computeTags, endpointPattern } from "./detect.js";
-import { askViaCli, isValidModel, DEFAULT_API_MODEL } from "./providers.js";
+import { askViaCli, isValidModel, setupHint, DEFAULT_API_MODEL } from "./providers.js";
 import { describeBody } from "./decode.js";
 
 const MODEL = DEFAULT_API_MODEL;
@@ -152,7 +152,13 @@ Question: ${question}`;
 
 export async function askAI(store, { question, selectedId, filter, provider = "api", model }) {
   if (provider !== "api") {
-    const answer = await askViaCli(provider, cliPrompt(store, { question, selectedId, filter }), model);
+    let answer;
+    try {
+      answer = await askViaCli(provider, cliPrompt(store, { question, selectedId, filter }), model);
+    } catch (e) {
+      const hint = setupHint(provider, e.message);
+      throw new Error(hint ? `${e.message}\n\n**How to fix:** ${hint}` : e.message);
+    }
     return { answer: answer.trim(), trace: [{ tool: `via ${provider}${model ? ` (${model})` : ""}`, input: {} }] };
   }
   const client = new Anthropic();

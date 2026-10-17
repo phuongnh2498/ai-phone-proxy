@@ -40,10 +40,41 @@ function which(bin) {
   return null;
 }
 
-let cache;
+// How to get each CLI working, shown when it's missing or a call fails.
+export const SETUP = {
+  claude: { install: "curl -fsSL https://claude.ai/install.sh | bash", login: "claude", docs: "https://docs.claude.com/en/docs/claude-code/setup", plan: "a Claude Pro or Max plan" },
+  codex: { install: "npm install -g @openai/codex", login: "codex login", docs: "https://github.com/openai/codex", plan: "a ChatGPT Plus, Pro or Team plan" },
+  agy: { install: null, login: "agy", docs: "https://antigravity.google", plan: "a Google account with Antigravity access" },
+};
+
+// Turn a raw CLI failure into a next step the user can actually take.
+export function setupHint(provider, error = "") {
+  const s = SETUP[provider];
+  if (!s) return null;
+  const e = String(error);
+  if (/not found|ENOENT/i.test(e)) {
+    return `Install it: ${s.install ? `\`${s.install}\`` : `see ${s.docs}`}, then run \`${s.login}\` once in Terminal to sign in. Phone Proxy picks it up within 30 seconds. Needs ${s.plan}.`;
+  }
+  if (/log ?in|logged in|sign ?in|auth|unauthori[sz]ed|401|403|credential|token expired/i.test(e)) {
+    return `Sign in: run \`${s.login}\` in Terminal and finish the login, then try again.`;
+  }
+  if (/usage|credits|quota|rate limit|429|limit reached/i.test(e)) {
+    return "Your plan's usage limit is reached. Pick another model or engine, or wait for the limit to reset.";
+  }
+  if (/model/i.test(e)) return "That model isn't available on your plan. Pick Default or another model.";
+  if (/timed out/i.test(e)) return "The CLI took too long. Ask a narrower question or pick a faster model.";
+  return `Check that \`${s.login}\` works in Terminal on its own. Setup guide: ${s.docs}`;
+}
+
+// Re-checked every 30s so a CLI installed while the app runs shows up without a restart.
+let cache, cacheAt = 0;
 export function availableProviders() {
-  if (!cache) {
-    cache = Object.entries(PROVIDERS).map(([id, p]) => ({ id, label: p.label, available: p.bin ? Boolean(which(p.bin)) : true }));
+  if (!cache || Date.now() - cacheAt > 30_000) {
+    cache = Object.entries(PROVIDERS).map(([id, p]) => {
+      const available = p.bin ? Boolean(which(p.bin)) : true;
+      return { id, label: p.label, available, ...(available || !SETUP[id] ? {} : { hint: setupHint(id, "not found") }) };
+    });
+    cacheAt = Date.now();
   }
   return cache;
 }
@@ -53,11 +84,13 @@ export function availableProviders() {
 export const DEFAULT_API_MODEL = process.env.PHONE_PROXY_MODEL || "claude-opus-5-5";
 const MODELS_TTL_MS = 10 * 60 * 1000;
 const CLAUDE_ALIASES = [ // Claude Code resolves these to the newest model of each family
-  { id: "fable", label: "Fable (latest)" },
-  { id: "opus", label: "Opus (latest)" },
-  { id: "sonnet", label: "Sonnet (latest)" },
-  { id: "haiku", label: "Haiku (latest)" },
+  { id: "fable", label: "Fable" },
+  { id: "opus", label: "Opus" },
+  { id: "sonnet", label: "Sonnet" },
+  { id: "haiku", label: "Haiku" },
 ];
+const CLAUDE_RESOLVE_TTL_MS = 24 * 60 * 60 * 1000;
+const CLAUDE_RESOLVED_PATH = path.join(DATA_DIR, "claude-models.json");
 const modelCache = new Map(); // provider -> { at, models }
 
 // Model names go into argv, so only allow plain ids (no leading "-" that a CLI could read as a flag).
@@ -77,6 +110,62 @@ async function anthropicModels() {
   return out;
 }
 
+// Claude Code has no "list models" command and its aliases move with each release, so ask it:
+// a one-word prompt per alias, run with the same flags as Ask AI, reports the exact model in modelUsage.
+let claudeResolving = null;
+function readClaudeResolved() {
+  try { return JSON.parse(fs.readFileSync(CLAUDE_RESOLVED_PATH, "utf8")); } catch { return null; }
+}
+async function probeClaude(bin, alias) {
+  const args = ["-p", "Reply with OK", "--output-format", "json", "--setting-sources", "project,local", "--tools", "", ...(alias ? ["--model", alias] : [])];
+  try {
+    const out = JSON.parse(await new Promise((resolve, reject) => {
+      execFile(bin, args, { cwd: WORK_DIR, env: childEnv("claude"), timeout: 90_000 }, (err, stdout) => (stdout ? resolve(stdout) : reject(err)));
+    }));
+    // Claude Code also makes a small side call to haiku (e.g. session title), so prefer the other model.
+    const used = Object.keys(out.modelUsage || {});
+    const model = used.find((m) => !/haiku/i.test(m)) || used[0] || null;
+    return out.is_error || !model ? { error: String(out.result || "no model reported").slice(0, 160) } : { model };
+  } catch (e) {
+    return { error: String(e.message || e).split("\n")[0].slice(0, 160) };
+  }
+}
+function resolveClaude(bin) {
+  claudeResolving ??= (async () => {
+    fs.mkdirSync(WORK_DIR, { recursive: true });
+    const map = {};
+    for (const alias of ["", ...CLAUDE_ALIASES.map((a) => a.id)]) map[alias] = await probeClaude(bin, alias); // one at a time: parallel runs collide
+    fs.writeFileSync(CLAUDE_RESOLVED_PATH, JSON.stringify({ at: Date.now(), map }));
+  })().finally(() => { claudeResolving = null; modelCache.delete("claude"); });
+  return claudeResolving;
+}
+function claudeList(bin, refresh) {
+  const saved = readClaudeResolved();
+  const stale = !saved || Date.now() - saved.at > CLAUDE_RESOLVE_TTL_MS;
+  if (bin && (refresh || stale)) resolveClaude(bin);
+  const r = (alias) => saved?.map?.[alias];
+  const describe = (name, alias) => {
+    const x = r(alias);
+    if (!x) return { label: `${name} (latest)` };
+    if (x.model) return { label: `${name} → ${x.model}` };
+    return { label: `${name} (unavailable: ${x.error})`, unavailable: true };
+  };
+  return {
+    pending: Boolean(claudeResolving),
+    defaultLabel: describe("Default", "").label,
+    models: CLAUDE_ALIASES.map((a) => ({ id: a.id, ...describe(a.label, a.id) })),
+  };
+}
+
+// Codex's default is whatever ~/.codex/config.toml says; otherwise Codex picks.
+function codexDefault() {
+  try {
+    const toml = fs.readFileSync(path.join(process.env.CODEX_HOME || path.join(HOME, ".codex"), "config.toml"), "utf8");
+    const m = toml.split(/^\s*\[/m)[0].match(/^\s*model\s*=\s*"([^"]+)"/m); // top-level key only, not a [profile]
+    return m ? `Default → ${m[1]} (from ~/.codex/config.toml)` : null;
+  } catch { return null; }
+}
+
 async function codexModels(bin) {
   const { models = [] } = JSON.parse(await capture(bin, ["debug", "models"]));
   return models.filter((m) => m.visibility === "list").sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
@@ -93,18 +182,22 @@ export async function listModels(provider, { refresh = false } = {}) {
   const hit = modelCache.get(provider);
   if (hit && !refresh && Date.now() - hit.at < MODELS_TTL_MS) return hit;
   const bin = PROVIDERS[provider]?.bin && which(PROVIDERS[provider].bin);
-  let models = [], error = null;
+  let models = [], error = null, pending = false;
+  let defaultLabel = { api: `Default → ${DEFAULT_API_MODEL}`, codex: codexDefault() || "Default (Codex picks)", agy: "Default (Antigravity's setting)" }[provider] || "Default";
   try {
     if (provider === "api") models = await anthropicModels();
-    else if (provider === "claude") models = [...CLAUDE_ALIASES, ...(await anthropicModels().catch(() => []))];
+    else if (provider === "claude") {
+      const c = claudeList(bin, refresh);
+      ({ pending, defaultLabel } = c);
+      models = [...c.models, ...(await anthropicModels().catch(() => []))];
+    }
     else if (provider === "codex" && bin) models = await codexModels(bin);
     else if (provider === "agy" && bin) models = await agyModels(bin);
   } catch (e) {
     error = `Couldn't list models: ${String(e.message || e).split("\n")[0].slice(0, 200)}`;
-    if (provider === "claude") models = CLAUDE_ALIASES;
   }
-  const out = { at: Date.now(), models: [{ id: "", label: provider === "api" ? `Default (${DEFAULT_API_MODEL})` : "Default" }, ...models], error };
-  if (!error) modelCache.set(provider, out);
+  const out = { at: Date.now(), models: [{ id: "", label: defaultLabel }, ...models], error, pending };
+  if (!error && !pending) modelCache.set(provider, out);
   return out;
 }
 
@@ -140,7 +233,7 @@ function run(bin, args, provider) {
 export async function askViaCli(provider, prompt, model) {
   const meta = PROVIDERS[provider];
   const bin = meta?.bin && which(meta.bin);
-  if (!bin) throw new Error(`${meta?.label || provider} not found. Install it and sign in, then restart Phone Proxy.`);
+  if (!bin) throw new Error(`${meta?.label || provider} not found.`);
   const modelArgs = (flag) => (isValidModel(model) ? [flag, model] : []);
 
   if (provider === "claude") {
